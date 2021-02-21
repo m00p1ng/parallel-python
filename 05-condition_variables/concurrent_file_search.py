@@ -1,14 +1,14 @@
 import os
 from os.path import isdir, join, expanduser
 from threading import Lock, Thread
+from wait_group import WaitGroup
 
 mutex = Lock()
 matches = []
 
 
-def file_search(root, filename):
+def file_search(root, filename, wait_group):
     print("Searching in:", root)
-    child_thread = []
     for file in os.listdir(root):
         full_path = join(root, file)
         if filename in file:
@@ -16,18 +16,20 @@ def file_search(root, filename):
             matches.append(full_path)
             mutex.release()
         if isdir(full_path):
-            t = Thread(target=file_search, args=([full_path, filename]))
+            wait_group.add(1)
+            t = Thread(target=file_search, args=([full_path, filename, wait_group]))
             t.start()
-            child_thread.append(t)
-    for t in child_thread:
-        t.join()
+    wait_group.done()
 
 
 def main():
+    wait_group = WaitGroup()
+    wait_group.add(1)
+
     dirname = expanduser('~') + '/Desktop'
-    t = Thread(target=file_search, args=([dirname, '.DS_Store']))
+    t = Thread(target=file_search, args=([dirname, '.DS_Store', wait_group]))
     t.start()
-    t.join()
+    wait_group.wait()
     for m in matches:
         print("Matched:", m)
 
